@@ -1,4 +1,6 @@
 # go-sche
+[![codecov](https://codecov.io/gh/czasg/go-sche/branch/main/graph/badge.svg?token=SQS18BX6SG)](https://codecov.io/gh/czasg/go-sche)
+
 go-sche is a golang library that lets you schedule your task to be executed later.
 
 You can add new jobs or remove old ones on the fly as you please. 
