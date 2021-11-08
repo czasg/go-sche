@@ -26,7 +26,7 @@ func TestNewStoreMemory(t *testing.T) {
 	assert(t, store.DelTask(&Task{ID: 3}), nil)
 	assert(t, store.DelTask(&Task{}), StoreNoTaskErr)
 	task, err := store.GetTaskByID(1)
-	assert(t, task, &Task{ID: 1, NextRunTime: now.Add(time.Second)})
+	assert(t, task.ID, 1)
 	assert(t, err, nil)
 	_, err = store.GetTaskByID(0)
 	assert(t, err, StoreNoTaskErr)
