@@ -1,5 +1,7 @@
 # go-sche
+[![LICENSE](https://img.shields.io/github/license/mashape/apistatus.svg?style=flat-square&label=License)](https://github.com/czasg/go-sche/blob/master/LICENSE)
 [![codecov](https://codecov.io/gh/czasg/go-sche/branch/main/graph/badge.svg?token=SQS18BX6SG)](https://codecov.io/gh/czasg/go-sche)
+[![GitHub Stars](https://img.shields.io/github/stars/czasg/go-sche.svg?style=flat-square&label=Stars&logo=github)](https://github.com/czasg/go-sche/stargazers)
 
 go-sche is a golang library that lets you schedule your task to be executed later.
 
