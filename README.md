@@ -5,11 +5,9 @@
 
 go-sche is a golang library that lets you schedule your task to be executed later.
 
-You can add new jobs or remove old ones on the fly as you please. 
-If you store your jobs in a database like postgres,
-they will also survive scheduler restarts and maintain their state. 
+You can add、update、delete jobs as you please.
 
-When the scheduler restarted, it will then run all the jobs it should have run while it was offline.
+When the scheduler restarted and you choose postgres store, it will then run all the jobs it should have run while it was offline. try it.
 ```text
 |—————————————|                          notify by gonal
 |  scheduler  | ————————> task<labels> |-----------------> label |-----> handler
