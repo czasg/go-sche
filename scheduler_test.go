@@ -108,7 +108,10 @@ func TestScheduler_Start(t *testing.T) {
 	scheduler = Scheduler{}
 	ctx, _ = context.WithTimeout(context.Background(), time.Millisecond)
 	scheduler.Start(ctx)
-	gonal.SetMaxConcurrent(ctx, 0, queue.NewFifoMemoryQueue(0))
+	_ = gonal.SetContext(ctx)
+	_ = gonal.SetConcurrent(0)
+	_ = gonal.SetQueue(queue.NewFifoMemoryQueue(0))
+	//gonal.SetMaxConcurrent(ctx, 0, queue.NewFifoMemoryQueue(0))
 
 	scheduler = Scheduler{}
 	ctx, _ = context.WithTimeout(context.Background(), time.Second*2)

@@ -6,6 +6,14 @@ type Queue interface {
 	Push(data []byte) error
 	Pop() ([]byte, error)
 	Close() error
+	Len() int
+}
+
+type PriorityQueue interface {
+	Push(data []byte, priority int) error
+	Pop() ([]byte, error)
+	Close() error
+	Len() int
 }
 
 var (

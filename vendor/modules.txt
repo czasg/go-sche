@@ -1,6 +1,7 @@
-# github.com/czasg/go-queue v0.0.0-20211107062837-7bc258b860e9
+# github.com/czasg/go-queue v0.0.0-20211206102528-0d03e5c8ace8
+## explicit
 github.com/czasg/go-queue
-# github.com/czasg/gonal v0.0.0-20211107082529-a6a469262fc9
+# github.com/czasg/gonal v0.0.0-20211207122219-7f69affd4b3e
 ## explicit
 github.com/czasg/gonal
 # github.com/go-pg/pg/v10 v10.10.6
@@ -23,7 +24,8 @@ github.com/robfig/cron
 github.com/tmthrgd/go-hex
 # github.com/vmihailenco/bufpool v0.1.11
 github.com/vmihailenco/bufpool
-# github.com/vmihailenco/msgpack/v5 v5.3.4
+# github.com/vmihailenco/msgpack/v5 v5.3.5
+## explicit
 github.com/vmihailenco/msgpack/v5
 github.com/vmihailenco/msgpack/v5/msgpcode
 # github.com/vmihailenco/tagparser v0.1.2
@@ -34,9 +36,11 @@ github.com/vmihailenco/tagparser/internal/parser
 github.com/vmihailenco/tagparser/v2
 github.com/vmihailenco/tagparser/v2/internal
 github.com/vmihailenco/tagparser/v2/internal/parser
-# golang.org/x/crypto v0.0.0-20210921155107-089bfa567519
+# golang.org/x/crypto v0.0.0-20211202192323-5770296d904e
+## explicit
 golang.org/x/crypto/pbkdf2
-# golang.org/x/sys v0.0.0-20210923061019-b8560ed6a9b7
+# golang.org/x/sys v0.0.0-20211205182925-97ca703d548d
+## explicit
 golang.org/x/sys/cpu
 # mellium.im/sasl v0.2.1
 mellium.im/sasl
