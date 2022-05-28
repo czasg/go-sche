@@ -2,17 +2,16 @@ package sche
 
 import (
 	"errors"
-	"math"
 	"time"
 )
 
 var (
-	MaxDateTime = time.Now().Add(time.Duration(math.MaxInt64))
+	MaxDateTime = time.Date(9999, 1, 1, 0, 0, 0, 0, time.Local)
 )
 
 var (
-	StoreInvalidTaskErr     = errors.New("store invalid task.")
-	StoreNoTaskErr          = errors.New("store no task.")
+	StoreInvalidTaskErr = errors.New("store invalid task.")
+	StoreNoTaskErr      = errors.New("store no task.")
 )
 
 type Store interface {

@@ -7,6 +7,7 @@ require (
 	github.com/czasg/gonal v0.0.0-20220528043824-46dfb6ed04c9
 	github.com/go-pg/pg/v10 v10.10.6
 	github.com/robfig/cron v1.2.0
+	github.com/sirupsen/logrus v1.8.1
 )
 
 require (
