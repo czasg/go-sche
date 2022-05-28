@@ -17,12 +17,11 @@ func encodeMapValue(e *Encoder, v reflect.Value) error {
 		return err
 	}
 
-	iter := v.MapRange()
-	for iter.Next() {
-		if err := e.EncodeValue(iter.Key()); err != nil {
+	for _, key := range v.MapKeys() {
+		if err := e.EncodeValue(key); err != nil {
 			return err
 		}
-		if err := e.EncodeValue(iter.Value()); err != nil {
+		if err := e.EncodeValue(v.MapIndex(key)); err != nil {
 			return err
 		}
 	}

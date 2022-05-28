@@ -341,9 +341,6 @@ func (d *Decoder) DecodeBool() (bool, error) {
 }
 
 func (d *Decoder) bool(c byte) (bool, error) {
-	if c == msgpcode.Nil {
-		return false, nil
-	}
 	if c == msgpcode.False {
 		return false, nil
 	}
