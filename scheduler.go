@@ -2,10 +2,22 @@ package sche
 
 import (
 	"context"
+	"errors"
 	"github.com/sirupsen/logrus"
 	"sync"
 	"time"
 )
+
+func NewScheduler(stores ...Store) *Scheduler {
+	var store Store
+	if len(stores) > 0 {
+		store = stores[0]
+	}
+	if store == nil {
+		store = NewStoreMemory()
+	}
+	return &Scheduler{Store: store}
+}
 
 type Scheduler struct {
 	Store  Store
@@ -14,6 +26,9 @@ type Scheduler struct {
 }
 
 func (s *Scheduler) Start(ctx context.Context) error {
+	if ctx == nil {
+		return errors.New("ctx nil")
+	}
 	var wait time.Time
 	s.notify = Notify{ctx: ctx}
 	if s.Store == nil {
@@ -69,6 +84,7 @@ func (s *Scheduler) AddTask(task *Task) error {
 		return err
 	}
 	s.notify.Notify()
+	logrus.WithField("taskName", task.Name).Info("新增任务成功")
 	return nil
 }
 
@@ -88,6 +104,7 @@ func (s *Scheduler) UpdateTask(task *Task) error {
 		return err
 	}
 	s.notify.Notify()
+	logrus.WithField("taskName", task.Name).Info("更新任务成功")
 	return nil
 }
 
@@ -102,5 +119,6 @@ func (s *Scheduler) DelTask(task *Task) error {
 		return err
 	}
 	s.notify.Notify()
+	logrus.WithField("taskName", task.Name).Info("删除任务成功")
 	return nil
 }

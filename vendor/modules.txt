@@ -6,48 +6,32 @@ github.com/czasg/go-queue
 github.com/czasg/gonal
 # github.com/go-pg/pg/v10 v10.10.6
 ## explicit; go 1.11
-github.com/go-pg/pg/v10
-github.com/go-pg/pg/v10/internal
-github.com/go-pg/pg/v10/internal/parser
-github.com/go-pg/pg/v10/internal/pool
-github.com/go-pg/pg/v10/orm
-github.com/go-pg/pg/v10/pgjson
-github.com/go-pg/pg/v10/types
 # github.com/go-pg/zerochecker v0.2.0
 ## explicit; go 1.13
-github.com/go-pg/zerochecker
 # github.com/jinzhu/inflection v1.0.0
 ## explicit
-github.com/jinzhu/inflection
 # github.com/robfig/cron v1.2.0
 ## explicit
 github.com/robfig/cron
+# github.com/sirupsen/logrus v1.8.1
+## explicit; go 1.13
+github.com/sirupsen/logrus
 # github.com/tmthrgd/go-hex v0.0.0-20190904060850-447a3041c3bc
 ## explicit
-github.com/tmthrgd/go-hex
 # github.com/vmihailenco/bufpool v0.1.11
 ## explicit; go 1.13
-github.com/vmihailenco/bufpool
 # github.com/vmihailenco/msgpack/v5 v5.3.4
 ## explicit; go 1.11
-github.com/vmihailenco/msgpack/v5
-github.com/vmihailenco/msgpack/v5/msgpcode
 # github.com/vmihailenco/tagparser v0.1.2
 ## explicit; go 1.13
-github.com/vmihailenco/tagparser
-github.com/vmihailenco/tagparser/internal
-github.com/vmihailenco/tagparser/internal/parser
 # github.com/vmihailenco/tagparser/v2 v2.0.0
 ## explicit; go 1.15
-github.com/vmihailenco/tagparser/v2
-github.com/vmihailenco/tagparser/v2/internal
-github.com/vmihailenco/tagparser/v2/internal/parser
 # golang.org/x/crypto v0.0.0-20210921155107-089bfa567519
 ## explicit; go 1.17
-golang.org/x/crypto/pbkdf2
 # golang.org/x/sys v0.0.0-20210923061019-b8560ed6a9b7
 ## explicit; go 1.17
-golang.org/x/sys/cpu
+golang.org/x/sys/internal/unsafeheader
+golang.org/x/sys/unix
+golang.org/x/sys/windows
 # mellium.im/sasl v0.2.1
 ## explicit
-mellium.im/sasl

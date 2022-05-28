@@ -29,10 +29,10 @@ func TestScheduler_DelTask(t *testing.T) {
 
 func TestScheduler_Start(t *testing.T) {
 	label := map[string]string{"test": "1"}
-	scheduler := Scheduler{}
+	scheduler := NewScheduler()
 	err := scheduler.AddTask(&Task{
 		ID:          0,
-		Name:        "",
+		Name:        "test",
 		Label:       label,
 		Trig:        "* * * * *",
 		LastRunTime: time.Time{},

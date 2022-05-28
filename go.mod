@@ -3,14 +3,14 @@ module github.com/czasg/go-sche
 go 1.17
 
 require (
-	github.com/czasg/go-queue v0.0.0-20220528034710-413f3a61077f
 	github.com/czasg/gonal v0.0.0-20220528043824-46dfb6ed04c9
-	github.com/go-pg/pg/v10 v10.10.6
 	github.com/robfig/cron v1.2.0
 	github.com/sirupsen/logrus v1.8.1
 )
 
 require (
+	github.com/czasg/go-queue v0.0.0-20220528034710-413f3a61077f // indirect
+	github.com/go-pg/pg/v10 v10.10.6 // indirect
 	github.com/go-pg/zerochecker v0.2.0 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/tmthrgd/go-hex v0.0.0-20190904060850-447a3041c3bc // indirect
