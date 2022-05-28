@@ -14,7 +14,6 @@ func NewStoreMemory() *StoreMemory {
 		Index:    0,
 		Tasks:    list.New(),
 		TasksMap: map[int64]*list.Element{},
-		Lock:     sync.RWMutex{},
 	}
 }
 
@@ -22,10 +21,12 @@ type StoreMemory struct {
 	Index    int64
 	Tasks    *list.List
 	TasksMap map[int64]*list.Element
-	Lock     sync.RWMutex
+	Lock     sync.Mutex
 }
 
 func (s *StoreMemory) Todo(now time.Time) ([]*Task, error) {
+	s.Lock.Lock()
+	defer s.Lock.Unlock()
 	tasks := []*Task{}
 	for el := s.Tasks.Front(); el != nil; el = el.Next() {
 		task := el.Value.(*Task)
@@ -42,6 +43,8 @@ func (s *StoreMemory) Todo(now time.Time) ([]*Task, error) {
 }
 
 func (s *StoreMemory) GetNextRunTime() (time.Time, error) {
+	s.Lock.Lock()
+	defer s.Lock.Unlock()
 	if s.Tasks.Len() == 0 {
 		return MaxDateTime, nil
 	}
@@ -56,6 +59,8 @@ func (s *StoreMemory) GetNextRunTime() (time.Time, error) {
 }
 
 func (s *StoreMemory) AddTask(task *Task) error {
+	s.Lock.Lock()
+	defer s.Lock.Unlock()
 	if task.ID != 0 {
 		return StoreInvalidTaskErr
 	}
@@ -74,6 +79,8 @@ func (s *StoreMemory) AddTask(task *Task) error {
 }
 
 func (s *StoreMemory) UpdateTask(task *Task) error {
+	s.Lock.Lock()
+	defer s.Lock.Unlock()
 	element, ok := s.TasksMap[task.ID]
 	if !ok {
 		return StoreNoTaskErr
@@ -95,6 +102,8 @@ func (s *StoreMemory) UpdateTask(task *Task) error {
 }
 
 func (s *StoreMemory) DelTask(task *Task) error {
+	s.Lock.Lock()
+	defer s.Lock.Unlock()
 	el, ok := s.TasksMap[task.ID]
 	if !ok {
 		return StoreNoTaskErr
@@ -105,6 +114,8 @@ func (s *StoreMemory) DelTask(task *Task) error {
 }
 
 func (s *StoreMemory) GetTaskByID(id int64) (*Task, error) {
+	s.Lock.Lock()
+	defer s.Lock.Unlock()
 	el, ok := s.TasksMap[id]
 	if !ok {
 		return nil, StoreNoTaskErr

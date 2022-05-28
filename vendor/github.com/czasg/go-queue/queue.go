@@ -1,24 +1,19 @@
 package queue
 
-import "errors"
-
-type Queue interface {
-	Push(data []byte) error
-	Pop() ([]byte, error)
-	Close() error
-	Len() int
-}
-
-type PriorityQueue interface {
-	Push(data []byte, priority int) error
-	Pop() ([]byte, error)
-	Close() error
-	Len() int
-}
+import (
+    "context"
+    "errors"
+)
 
 var (
-	ErrClosed                 = errors.New("queue closed")
-	ErrEmptyQueue             = errors.New("queue empty")
-	ErrFullQueue              = errors.New("queue full")
-	ErrChunkSizeInconsistency = errors.New("queue chunk size inconsistency")
+    ErrQueueClosed = errors.New("queue closed")
+    ErrQueueEmpty  = errors.New("queue empty")
+    ErrQueueFull   = errors.New("queue full")
 )
+
+type Queue interface {
+    Get(ctx context.Context) ([]byte, error)
+    Put(ctx context.Context, data []byte) error
+    Len() int
+    Close() error
+}

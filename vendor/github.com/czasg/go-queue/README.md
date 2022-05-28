@@ -5,186 +5,188 @@
 [![GitHub Forks](https://img.shields.io/github/forks/czasg/go-queue.svg?style=flat-square&label=Forks&logo=github)](https://github.com/czasg/go-queue/network/members)
 [![GitHub Issue](https://img.shields.io/github/issues/czasg/go-queue.svg?style=flat-square&label=Issues&logo=github)](https://github.com/czasg/go-queue/issues)
 
+## 1.背景
+在 go 中，存在 `chan` 这种天然的 FIFO 队列。  
+但类似 **LIFO、持久化** 等特殊结构/能力，并没有通用的标准库，更多的是借用三方软件来实现。 
+ 
+go-queue 定义了简单的队列标准，提供了 **FIFO、LIFO、持久化** 等能力。
 
-go-queue was thread-safe collections for memory/disks queues (FIFO), stacks (LIFO) and priority.
+## 2.目标
+1、内存队列、磁盘队列  
+- [x] FIFO Memory Queue - 内存队列
+- [x] LIFO Memory Queue - 内存队列
+- [x] FIFO Disk Queue - 磁盘队列
+- [x] LIFO Disk Queue - 磁盘队列
 
+2、Get/Put 支持阻塞，磁盘队列可不支持
+- [x] FIFO Block Memory Queue - 内存队列支持阻塞
+- [x] LIFO Block Memory Queue - 内存队列支持阻塞
 
-```text
-                  |—————————|                   |——————————————————|               
-                  |  queue  | -----factory----- |  priority queue  |
-                  |—————————|                   |——————————————————|
-           ____________|___________
-          |                        |      
-      |————————|              |————————|
-      |  fifo  |              |  lifo  |
-      |————————|              |————————|
-     _____|_____              _____|_____
-    |           |            |           |
-|————————||——————————|   |————————||——————————|
-|  disk  ||  memory  |   |  disk  ||  memory  |
-|————————||——————————|   |————————||——————————|
+## 3.使用
+1、初始化队列
+```go
+// 依赖
+import "github.com/czasg/go-queue"
+
+// 初始化内存队列
+_ = queue.NewFifoMemoryQueue() 
+_ = queue.NewLifoMemoryQueue(2048) 
+
+// 初始化磁盘队列，需要指定目标文件
+var fifofilename, lifofilename string
+_, _ = queue.NewFifoDiskQueue(fifofilename)
+_, _ = queue.NewLifoDiskQueue(lifofilename)
 ```
 
-### plan
-- [x] fifo memory queue
-- [x] fifo disk queue
-- [x] lifo memory queue
-- [x] lifo disk queue
-- [x] priority queue
+2、推送数据
+```go
+q := queue.NewFifoMemoryQueue() 
+// 非阻塞
+_ = q.Put(nil, []byte("data"))
+// 阻塞
+_ = q.Put(context.Background(), []byte("data"))
+```
 
-### interface
-```golang
+3、获取数据
+```go
+q := queue.NewFifoMemoryQueue() 
+// 非阻塞
+_, _ = q.Get(nil)
+// 阻塞
+_, _ = q.Get(context.Background())
+```
+
+4、关闭队列
+```go
+q := queue.NewFifoMemoryQueue() 
+q.Close()
+```
+特别是磁盘队列，使用完后务必确保关闭。否则会出现**文件损坏**问题。
+
+## 4.队列接口
+```
 type Queue interface {
-	Push(data []byte) error
-	Pop() ([]byte, error)
-	Close() error
-	Len() int
-}
-
-type PriorityQueue interface {
-	Push(data []byte, priority int) error
-	Pop() ([]byte, error)
-	Close() error
-	Len() int
+    Get(ctx context.Context) ([]byte, error)
+    Put(ctx context.Context, data []byte) error
+    Len() int
+    Close() error
 }
 ```
+其中上下文`context.Context`用于决定此次`Get / Put`是否阻塞。
 
-# Demo
-### fifo memory queue
-```golang
+## 5.Demo
+### FIFO Memory Queue
+```go
 package main
 
 import (
-	"github.com/czasg/go-queue"
+    "context"
+    "fmt"
+    "github.com/czasg/go-queue"
+    "time"
 )
 
 func main() {
-	maxQueueSize := 2 // out of max size, push data will return (nil, ErrFullQueue)
-	q := queue.NewFifoMemoryQueue(maxQueueSize)
-	defer q.Close()
+    q := queue.NewFifoMemoryQueue()
+    _ = q.Put(nil, []byte("go-queue"))
+    data, _ := q.Get(nil)
+    fmt.Println("非阻塞获取数据", string(data))
 
-	q.Push([]byte("test1")) // nil
-	q.Pop()                 // test, nil
-
-	q.Push([]byte("test1")) // nil
-   	q.Push([]byte("test1")) // nil
-   	q.Push([]byte("test1")) // ErrFullQueue
-
-   	q.Pop() // test, nil
-    	q.Pop() // test, nil
-    	q.Pop() // ErrEmptyQueue
+    go func() {
+        data, _ := q.Get(context.Background())
+        fmt.Println("阻塞获取数据", string(data))
+    }()
+    time.Sleep(time.Second * 2)
+    _ = q.Put(nil, []byte("go-queue"))
+    time.Sleep(time.Millisecond)
+    q.Close()
 }
 ```
 
-### fifo disk queue
-disk queue will never full.
-```golang
+### LIFO Memory Queue
+```go
 package main
 
 import (
-	"github.com/czasg/go-queue"
-	"io/ioutil"
-	"os"
+    "context"
+    "fmt"
+    "github.com/czasg/go-queue"
+    "time"
 )
 
 func main() {
-	dir, _ := ioutil.TempDir("", "")
-	defer os.RemoveAll(dir)
-	
-	q, _ := queue.NewFifoDiskQueue(dir)
-	_ = q.Push([]byte("test1"))
-	_ = q.Push([]byte("test2"))
-	_ = q.Push([]byte("test3"))
-	_ = q.Close()
+    q := queue.NewLifoMemoryQueue()
+    _ = q.Put(nil, []byte("go-queue"))
+    data, _ := q.Get(nil)
+    fmt.Println("非阻塞获取数据", string(data))
 
-	q, _ = queue.NewFifoDiskQueue(dir) // open again
-	_, _ = q.Pop() // test1
-	_, _ = q.Pop() // test2
-	_, _ = q.Pop() // test3
-	_ = q.Close()
+    go func() {
+        data, _ := q.Get(context.Background())
+        fmt.Println("阻塞获取数据", string(data))
+    }()
+    time.Sleep(time.Second * 2)
+    _ = q.Put(nil, []byte("go-queue"))
+    time.Sleep(time.Millisecond)
+    q.Close()
 }
 ```
 
-### lifo memory queue
-```golang
+### FIFO Disk Queue
+```go
 package main
 
 import (
-	"github.com/czasg/go-queue"
+    "fmt"
+    "github.com/czasg/go-queue"
+    "io/ioutil"
+    "os"
 )
 
 func main() {
-	maxQueueSize := 2 // out of max size, push data will return (nil, ErrFullQueue)
-	q := queue.NewLifoMemoryQueue(maxQueueSize)
-	defer q.Close()
+    file, err := ioutil.TempFile("", "")
+    if err != nil {
+        panic(err)
+    }
+    defer os.RemoveAll(file.Name())
+    file.Close()
 
-	q.Push([]byte("test1")) // nil
-	q.Pop()                 // test, nil
+    q, _ := queue.NewFifoDiskQueue(file.Name())
+    _ = q.Put(nil, []byte("go-queue"))
+    q.Close()
 
-	q.Push([]byte("test1")) // nil
-	q.Push([]byte("test1")) // nil
-	q.Push([]byte("test1")) // ErrFullQueue
-
-	q.Pop() // test, nil
-	q.Pop() // test, nil
-	q.Pop() // ErrEmptyQueue
+    q, _ = queue.NewFifoDiskQueue(file.Name())
+    data, _ := q.Get(nil)
+    fmt.Println("获取数据", string(data))
+    q.Close()
 }
 ```
 
-### lifo disk queue
-disk queue will never full.
-```golang
+### LIFO Disk Queue
+```go
 package main
 
 import (
-	"github.com/czasg/go-queue"
-	"io/ioutil"
-	"os"
+    "fmt"
+    "github.com/czasg/go-queue"
+    "io/ioutil"
+    "os"
 )
 
 func main() {
-	dir, _ := ioutil.TempDir("", "")
-	defer os.RemoveAll(dir)
+    file, err := ioutil.TempFile("", "")
+    if err != nil {
+        panic(err)
+    }
+    defer os.RemoveAll(file.Name())
+    file.Close()
 
-	q, _ := queue.NewLifoDiskQueue(dir)
-	_ = q.Push([]byte("test1"))
-	_ = q.Push([]byte("test2"))
-	_ = q.Push([]byte("test3"))
-	_ = q.Close()
+    q, _ := queue.NewLifoDiskQueue(file.Name())
+    _ = q.Put(nil, []byte("go-queue"))
+    q.Close()
 
-	q, _ = queue.NewLifoDiskQueue(dir) // open again
-	_, _ = q.Pop() // test3
-	_, _ = q.Pop() // test2
-	_, _ = q.Pop() // test1
-	_ = q.Close()
-}
-```
-
-### priority queue
-`PriorityQueue` based on `Queue` as a queue factory.
-```golang
-package main
-
-import (
-	"fmt"
-	"github.com/czasg/go-queue"
-	"reflect"
-)
-
-func main() {
-	factory := func(priority int) queue.Queue {
-		return queue.NewFifoMemoryQueue(1024)
-	}
-	q := queue.NewPriorityQueueFactory(nil, factory)
-	_ = q.Push([]byte("v1"), 1)
-	_ = q.Push([]byte("v2"), 10)
-	_ = q.Push([]byte("v3"), 5)
-
-	data, _ := q.Pop()
-	fmt.Println(reflect.DeepEqual(data, []byte("v2")))
-	data, _ = q.Pop()
-	fmt.Println(reflect.DeepEqual(data, []byte("v3")))
-	data, _ = q.Pop()
-	fmt.Println(reflect.DeepEqual(data, []byte("v1")))
+    q, _ = queue.NewLifoDiskQueue(file.Name())
+    data, _ := q.Get(nil)
+    fmt.Println("获取数据", string(data))
+    q.Close()
 }
 ```

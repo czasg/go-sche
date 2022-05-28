@@ -3,255 +3,160 @@ package gonal
 import (
     "context"
     "encoding/json"
-    "errors"
     "fmt"
     "github.com/czasg/go-queue"
     "reflect"
     "runtime"
     "sync"
+    "time"
 )
 
-var (
-    gonal      *Gonal
-    ErrRunning = errors.New("gonal running")
-)
-
-func Notify(payload Payload) error {
-    return gonal.Notify(payload)
+func NewGonal(ctx context.Context, q queue.Queue) *Gonal {
+    if ctx == nil {
+        ctx = context.Background()
+    }
+    if q == nil {
+        q = queue.NewFifoMemoryQueue()
+    }
+    gonal := &Gonal{
+        queue:    q,
+        handlers: map[string][]Handler{},
+    }
+    gonal.ctx, gonal.cancel = context.WithCancel(ctx)
+    gonal.SetConcurrent(runtime.NumCPU() * 2)
+    return gonal
 }
 
-func Bind(label Label, handler ...Handler) {
-    gonal.Bind(label, handler...)
+func Notify(ctx context.Context, labels Labels, data []byte) error {
+    return gonal.Notify(ctx, labels, data)
 }
 
-func Fetch(label Label) []Handler {
-    return gonal.Fetch(label)
+func BindHandler(labels Labels, handlers ...Handler) {
+    gonal.BindHandler(labels, handlers...)
 }
 
-func SetContext(ctx context.Context) error {
-    return gonal.SetContext(ctx)
+func FetchHandler(labels Labels) []Handler {
+    return gonal.FetchHandler(labels)
 }
 
-func SetQueue(q queue.Queue) error {
-    return gonal.SetQueue(q)
-}
-
-func SetConcurrent(concurrent int) error {
-    return gonal.SetConcurrent(concurrent)
+func SetConcurrent(concurrent int) {
+    gonal.SetConcurrent(concurrent)
 }
 
 func Close() error {
     return gonal.Close()
 }
 
-type Handler func(ctx context.Context, payload Payload)
-type Label map[string]string
-type Payload struct {
-    Label Label
-    Body  []byte
-}
+var gonal = NewGonal(nil, nil)
+
+type Placeholder struct{}
+type Labels map[string]string
+type Handler func(ctx context.Context, labels Labels, data []byte)
+
 type Gonal struct {
-    once          sync.Once
-    Ctx           context.Context
-    Cancel        context.CancelFunc
-    Concurrent    int
-    LabelsMatcher map[string][]Handler
-    Q             queue.Queue
-    C             chan struct{}
-    Lock          sync.Mutex
-    Running       bool
+    ctx      context.Context
+    cancel   context.CancelFunc
+    reset    context.CancelFunc
+    handlers map[string][]Handler
+    queue    queue.Queue
+    lock     sync.Mutex
 }
 
-func (g *Gonal) Notify(payload Payload) error {
-    g.once.Do(func() {
-        g.Lock.Lock()
-        defer g.Lock.Unlock()
-        g.Running = true
-        go g.loop()
-    })
+type Payload struct {
+    Labels Labels
+    Data   []byte
+}
+
+func (g *Gonal) Notify(ctx context.Context, labels Labels, data []byte) error {
     select {
-    case <-g.Ctx.Done():
-        return g.Ctx.Err()
+    case <-g.ctx.Done():
+        return g.ctx.Err()
     default:
     }
-    body, _ := json.Marshal(payload)
-    err := g.Q.Push(body)
+    body, err := json.Marshal(Payload{Labels: labels, Data: data})
     if err != nil {
         return err
     }
-    select {
-    case g.C <- struct{}{}:
-    default:
-    }
-    return nil
+    return g.queue.Put(ctx, body)
 }
 
-func (g *Gonal) Bind(label Label, handlers ...Handler) {
-    g.Lock.Lock()
-    defer g.Lock.Unlock()
-    if len(handlers) < 1 {
-        return
-    }
-    for k, v := range label {
-        key := fmt.Sprintf(`%s=%v`, k, v)
-        pool := g.LabelsMatcher[key]
-        if pool == nil {
-            pool = []Handler{}
-        }
-        pool = append(pool, handlers...)
-        g.LabelsMatcher[key] = pool
+func (g *Gonal) BindHandler(labels Labels, handlers ...Handler) {
+    g.lock.Lock()
+    defer g.lock.Unlock()
+    for key, value := range labels {
+        hk := fmt.Sprintf("%s=%s", key, value)
+        g.handlers[hk] = append(g.handlers[hk], handlers...)
     }
 }
 
-func (g *Gonal) Fetch(label Label) []Handler {
-    set := map[reflect.Value]struct{}{}
-    handlers := []Handler{}
-    for k, v := range label {
-        key := fmt.Sprintf(`%s=%v`, k, v)
-        pool, ok := g.LabelsMatcher[key]
+func (g *Gonal) FetchHandler(labels Labels) []Handler {
+    g.lock.Lock()
+    defer g.lock.Unlock()
+    results := []Handler{}
+    handlerSet := map[reflect.Value]Placeholder{}
+    for key, value := range labels {
+        hk := fmt.Sprintf("%s=%s", key, value)
+        handlers, ok := g.handlers[hk]
         if !ok {
             continue
         }
-        for _, handler := range pool {
-            _, ok := set[reflect.ValueOf(handler)]
+        for _, handler := range handlers {
+            _, ok := handlerSet[reflect.ValueOf(handler)]
             if ok {
                 continue
             }
-            set[reflect.ValueOf(handler)] = struct{}{}
-            handlers = append(handlers, handler)
+            handlerSet[reflect.ValueOf(handler)] = Placeholder{}
+            results = append(results, handler)
         }
     }
-    return handlers
-}
-
-func (g *Gonal) SetContext(ctx context.Context) error {
-    g.Lock.Lock()
-    defer g.Lock.Unlock()
-    if g.Running {
-        return ErrRunning
-    }
-    g.Ctx, g.Cancel = context.WithCancel(ctx)
-    return nil
-}
-
-func (g *Gonal) SetConcurrent(concurrent int) error {
-    g.Lock.Lock()
-    defer g.Lock.Unlock()
-    if g.Running {
-        return ErrRunning
-    }
-    g.Concurrent = concurrent
-    return nil
-}
-
-func (g *Gonal) SetQueue(queue queue.Queue) error {
-    g.Lock.Lock()
-    defer g.Lock.Unlock()
-    if g.Running {
-        return ErrRunning
-    }
-    g.Q = queue
-    return nil
+    return results
 }
 
 func (g *Gonal) Close() error {
-    g.Lock.Lock()
-    defer g.Lock.Unlock()
-    g.Running = false
-    if g.Cancel != nil {
-        g.Cancel()
+    if g.cancel != nil {
+        g.cancel()
     }
-    if g.Q == nil {
-        return nil
-    }
-    return g.Q.Close()
+    return g.queue.Close()
 }
 
-func (g *Gonal) loop() {
-    defer g.Close()
-    ch := make(chan struct{}, g.Concurrent)
+func (g *Gonal) SetConcurrent(concurrent int) {
+    g.lock.Lock()
+    defer g.lock.Unlock()
+    if g.reset != nil {
+        g.reset()
+        time.Sleep(time.Millisecond * 100)
+    }
+    ctx, cancel := context.WithCancel(g.ctx)
+    limit := make(chan Placeholder, concurrent)
+    g.reset = cancel
+    go g.loop(ctx, limit)
+}
+
+func (g *Gonal) loop(ctx context.Context, limit chan Placeholder) {
+    defer close(limit)
     for {
-        select {
-        case <-g.Ctx.Done():
+        data, err := g.queue.Get(ctx)
+        if err != nil {
             return
-        case <-g.C:
         }
-        func() {
-            for {
-                body, err := g.Q.Pop()
-                if err != nil {
-                    notifyQueuePopErr(err)
-                    return
-                }
-                var payload Payload
-                err = json.Unmarshal(body, &payload)
-                if err != nil {
-                    notifyJsonErr(err)
-                    return
-                }
-                for _, handler := range g.Fetch(payload.Label) {
-                    go func(han Handler) {
-                        defer func() {
-                            if err := recover(); err != nil {
-                                notifyHandlerPanic(err)
-                            }
-                            select {
-                            case <-ch:
-                            default:
-                            }
-                        }()
-                        han(g.Ctx, payload)
-                    }(handler)
-                    select {
-                    case <-g.Ctx.Done():
-                        return
-                    case ch <- struct{}{}:
-                    }
-                }
+        var payload Payload
+        err = json.Unmarshal(data, &payload)
+        if err != nil {
+            continue
+        }
+        for _, handler := range g.FetchHandler(payload.Labels) {
+            select {
+            case <-ctx.Done():
+                return
+            case limit <- Placeholder{}:
             }
-        }()
+            go func(handler Handler) {
+                defer func() {
+                    if err := recover(); err != nil {}
+                    <-limit
+                }()
+                handler(ctx, payload.Labels, payload.Data)
+            }(handler)
+        }
     }
-}
-
-func notifyQueuePopErr(err error) {
-    if errors.Is(err, queue.ErrEmptyQueue) {
-        return
-    }
-    _ = Notify(Payload{
-        Label: Label{
-            "gonal.internal.event":       "failure",
-            "gonal.internal.event.type":  "loop.queue.pop",
-            "gonal.internal.event.error": err.Error(),
-        },
-    })
-}
-
-func notifyJsonErr(err error) {
-    _ = Notify(Payload{
-        Label: Label{
-            "gonal.internal.event":       "failure",
-            "gonal.internal.event.type":  "loop.json.unmarshal",
-            "gonal.internal.event.error": err.Error(),
-        },
-    })
-}
-
-func notifyHandlerPanic(err interface{}) {
-    _ = Notify(Payload{
-        Label: Label{
-            "gonal.internal.event":       "failure",
-            "gonal.internal.event.type":  "loop.handler.panic",
-            "gonal.internal.event.error": fmt.Sprintf("%v", err),
-        },
-    })
-}
-
-func init() {
-    gonal = &Gonal{
-        LabelsMatcher: map[string][]Handler{},
-        C:             make(chan struct{}, 1),
-    }
-    _ = SetContext(context.Background())
-    _ = SetConcurrent(runtime.NumCPU() * 4)
-    _ = SetQueue(queue.NewFifoMemoryQueue(1024))
 }

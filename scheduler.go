@@ -2,94 +2,115 @@ package sche
 
 import (
 	"context"
-	"github.com/czasg/gonal"
-	"github.com/robfig/cron"
+	"errors"
+	"github.com/sirupsen/logrus"
+	"sync"
 	"time"
 )
 
-type Scheduler struct {
-	Store
-	Waiter
+func NewScheduler(stores ...Store) *Scheduler {
+	var store Store
+	if len(stores) > 0 {
+		store = stores[0]
+	}
+	if store == nil {
+		store = NewStoreMemory()
+	}
+	return &Scheduler{Store: store}
 }
 
-func (s *Scheduler) Start(ctx context.Context) {
+type Scheduler struct {
+	Store  Store
+	notify Notify
+	lock   sync.Mutex
+}
+
+func (s *Scheduler) Start(ctx context.Context) error {
+	if ctx == nil {
+		return errors.New("ctx nil")
+	}
 	var wait time.Time
-	s.Waiter = Waiter{ctx: ctx}
+	s.notify = Notify{ctx: ctx}
 	if s.Store == nil {
 		s.Store = NewStoreMemory()
 	}
 	for {
 		select {
 		case <-ctx.Done():
-			return
-		case <-s.Waiter.Wait(wait):
+			return ctx.Err()
+		case <-s.notify.Wait(wait):
 		}
 		now := time.Now()
-		todos, err := s.Store.Todo(now)
+		todo, err := s.Store.Todo(now)
 		if err != nil {
 			wait = MaxDateTime
-			notifyStoreTodoErr(err)
+			logrus.WithError(err).Error("获取待执行任务异常")
 			continue
 		}
-		for _, todo := range todos {
-			err = todo.Run()
+		for _, t := range todo {
+			log := logrus.WithField("taskName", t.Name)
+			log.Info("触发任务")
+			err = t.Run()
 			if err != nil {
-				notifyTaskRunErr(err)
+				log.WithError(err).Error("任务投放异常")
 				continue
 			}
-			err = s.Store.UpdateTask(todo)
+			err = s.Store.UpdateTask(t)
 			if err != nil {
-				notifyStoreUpdateErr(err)
+				log.WithError(err).Error("更新任务状态异常")
 			}
 		}
 		wait, err = s.Store.GetNextRunTime()
 		if err != nil {
 			wait = MaxDateTime
-			notifyStoreNextErr(err)
+			logrus.WithError(err).Error("获取下一次调度时间异常")
 		}
 	}
 }
 
 func (s *Scheduler) AddTask(task *Task) error {
-	ins, err := cron.Parse(string(task.Trig))
-	if err != nil {
-		return err
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	if s.Store == nil {
+		s.Store = NewStoreMemory()
 	}
-	TrigCronPool[task.Trig] = ins
 	if task.Label == nil {
 		task.Label = map[string]string{}
 	}
 	task.Label["task.label.name"] = task.Name
 	task.NextRunTime = task.Trig.GetNextRunTime(time.Now())
-	if s.Store == nil {
-		s.Store = NewStoreMemory()
-	}
-	err = s.Store.AddTask(task)
+	err := s.Store.AddTask(task)
 	if err != nil {
 		return err
 	}
-	s.Waiter.Wake()
+	s.notify.Notify()
+	logrus.WithField("taskName", task.Name).Info("新增任务成功")
 	return nil
 }
 
 func (s *Scheduler) UpdateTask(task *Task) error {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	if s.Store == nil {
+		s.Store = NewStoreMemory()
+	}
 	if task.Label == nil {
 		task.Label = map[string]string{}
 	}
 	task.Label["task.label.name"] = task.Name
 	task.NextRunTime = task.Trig.GetNextRunTime(time.Now())
-	if s.Store == nil {
-		s.Store = NewStoreMemory()
-	}
 	err := s.Store.UpdateTask(task)
 	if err != nil {
 		return err
 	}
-	s.Waiter.Wake()
+	s.notify.Notify()
+	logrus.WithField("taskName", task.Name).Info("更新任务成功")
 	return nil
 }
 
 func (s *Scheduler) DelTask(task *Task) error {
+	s.lock.Lock()
+	defer s.lock.Unlock()
 	if s.Store == nil {
 		s.Store = NewStoreMemory()
 	}
@@ -97,55 +118,7 @@ func (s *Scheduler) DelTask(task *Task) error {
 	if err != nil {
 		return err
 	}
-	s.Waiter.Wake()
+	s.notify.Notify()
+	logrus.WithField("taskName", task.Name).Info("删除任务成功")
 	return nil
-}
-
-type Waiter struct {
-	ctx    context.Context
-	cancel context.CancelFunc
-}
-
-func (w *Waiter) Wake() {
-	if w.cancel != nil {
-		w.cancel()
-	}
-}
-
-func (w *Waiter) Wait(wait time.Time) <-chan struct{} {
-	ctx, cancel := context.WithDeadline(w.ctx, wait)
-	w.cancel = cancel
-	return ctx.Done()
-}
-
-func notifyStoreTodoErr(err error) {
-	_ = gonal.Notify(gonal.Payload{Label: gonal.Label{
-		"sche.internal.event":       "failure",
-		"sche.internal.event.type":  "task.todo",
-		"sche.internal.event.error": err.Error(),
-	}})
-}
-
-func notifyStoreUpdateErr(err error) {
-	_ = gonal.Notify(gonal.Payload{Label: gonal.Label{
-		"sche.internal.event":       "failure",
-		"sche.internal.event.type":  "task.update",
-		"sche.internal.event.error": err.Error(),
-	}})
-}
-
-func notifyStoreNextErr(err error) {
-	_ = gonal.Notify(gonal.Payload{Label: gonal.Label{
-		"sche.internal.event":       "failure",
-		"sche.internal.event.type":  "task.next",
-		"sche.internal.event.error": err.Error(),
-	}})
-}
-
-func notifyTaskRunErr(err error) {
-	_ = gonal.Notify(gonal.Payload{Label: gonal.Label{
-		"sche.internal.event":       "failure",
-		"sche.internal.event.type":  "task.run",
-		"sche.internal.event.error": err.Error(),
-	}})
 }
